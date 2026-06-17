@@ -1,6 +1,8 @@
 import { google } from "googleapis";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
+const DCC_START_ROW = 5;
+const DCC_END_ROW = 1000;
 
 function getPrivateKey(): string {
   const key = process.env.GOOGLE_PRIVATE_KEY || "";
@@ -70,13 +72,37 @@ export async function lookupStock(sku: string, location: string): Promise<StockR
   return null;
 }
 
-export async function appendDccTask(values: unknown[]) {
+export async function writeDccTask(taskId: string, values: unknown[]) {
   const sheets = await getSheetsClient();
-  return sheets.spreadsheets.values.append({
-    spreadsheetId: spreadsheetId(),
-    range: "DCC_Task!A:Z",
+  const id = spreadsheetId();
+  const readRange = "DCC_Task!A" + DCC_START_ROW + ":W" + DCC_END_ROW;
+
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId: id,
+    range: readRange
+  });
+
+  const rows = existing.data.values || [];
+  let targetRow = DCC_START_ROW;
+
+  const existingIndex = rows.findIndex((row) => String(row[0] || "") === taskId);
+  if (existingIndex >= 0) {
+    targetRow = DCC_START_ROW + existingIndex;
+  } else {
+    const emptyIndex = rows.findIndex((row) => {
+      const task = String(row[0] || "").trim();
+      const sku = String(row[4] || "").trim();
+      const countedQty = String(row[7] || "").trim();
+      return !task && !sku && !countedQty;
+    });
+    targetRow = emptyIndex >= 0 ? DCC_START_ROW + emptyIndex : DCC_START_ROW + rows.length;
+  }
+
+  const writeRange = "DCC_Task!A" + targetRow + ":W" + targetRow;
+  return sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: writeRange,
     valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
     requestBody: { values: [values] }
   });
 }
