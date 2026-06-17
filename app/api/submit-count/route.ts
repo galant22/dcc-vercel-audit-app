@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { appendDccTask, lookupStock } from "@/lib/googleSheets";
+import { lookupStock, writeDccTask } from "@/lib/googleSheets";
 
 const SubmitSchema = z.object({
   sku: z.string().min(1),
@@ -12,6 +12,10 @@ const SubmitSchema = z.object({
   device_info: z.string().optional().default("WEB"),
   session_id: z.string().optional().default("")
 });
+
+function todayDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -36,25 +40,24 @@ export async function POST(req: Request) {
   const inputAt = new Date().toISOString();
   const gap = data.counted_qty - stock.quantity;
   const status = gap === 0 ? "Sesuai" : "Selisih";
+  const varianceValue = gap * stock.price;
   const taskId = stock.sku_number + "|" + stock.rack_name;
   const sessionId = data.session_id || "S-" + Date.now();
 
-  await appendDccTask([
-    inputAt,
+  await writeDccTask(taskId, [
+    taskId,
+    todayDate(),
+    stock.location_name,
+    stock.rack_name,
     stock.sku_number,
     stock.product_name,
-    stock.rack_name,
     stock.quantity,
     data.counted_qty,
     gap,
     status,
-    email,
-    data.note,
-    stock.price,
+    varianceValue,
     stock.product_type_name,
-    name,
-    "VERCEL_DCC_APP",
-    taskId,
+    stock.price,
     email,
     name,
     email,
@@ -62,7 +65,9 @@ export async function POST(req: Request) {
     "VERCEL_DCC_APP",
     data.device_info,
     sessionId,
-    "SINGLE"
+    "SINGLE",
+    data.note,
+    "VERCEL_APP"
   ]);
 
   return NextResponse.json({
