@@ -1,5 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { getActiveUserByEmail } from "@/lib/googleSheets";
 
 function getAllowedEmails(): string[] {
   return (process.env.ALLOWED_EMAILS || "")
@@ -8,16 +9,22 @@ function getAllowedEmails(): string[] {
     .filter(Boolean);
 }
 
-function isAllowedEmail(email?: string | null): boolean {
+function isAllowedByEnv(email?: string | null): boolean {
   if (!email) return false;
   const normalized = email.toLowerCase();
   const allowedEmails = getAllowedEmails();
   const allowedDomain = (process.env.ALLOWED_DOMAIN || "").trim().toLowerCase();
 
   if (allowedEmails.length > 0 && allowedEmails.includes(normalized)) return true;
-  if (allowedDomain && normalized.endsWith(`@${allowedDomain}`)) return true;
+  if (allowedDomain && normalized.endsWith("@" + allowedDomain)) return true;
 
-  return allowedEmails.length === 0 && !allowedDomain;
+  return false;
+}
+
+async function isAllowedByUsersSheet(email?: string | null): Promise<boolean> {
+  if (!email) return false;
+  const user = await getActiveUserByEmail(email);
+  return Boolean(user);
 }
 
 export const authOptions: NextAuthOptions = {
@@ -29,7 +36,9 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user }) {
-      return isAllowedEmail(user.email);
+      const sheetAllowed = await isAllowedByUsersSheet(user.email);
+      if (sheetAllowed) return true;
+      return isAllowedByEnv(user.email);
     },
     async session({ session, token }) {
       if (session.user) {
