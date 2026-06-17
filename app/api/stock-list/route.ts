@@ -22,19 +22,21 @@ export async function GET() {
   const id = spreadsheetId();
   const [stockRes, taskRes] = await Promise.all([
     sheets.spreadsheets.values.get({ spreadsheetId: id, range: "STOCK_MASTER!A2:J50000" }),
-    sheets.spreadsheets.values.get({ spreadsheetId: id, range: "DCC_Task!A5:W50000" })
+    sheets.spreadsheets.values.get({ spreadsheetId: id, range: "DCC_Task!A5:AB50000" })
   ]);
 
   const taskRows = taskRes.data.values || [];
-  const taskMap = new Map<string, { status: string; counted_qty: number; gap: number; input_at: string }>();
+  const taskMap = new Map<string, { status: string; counted_qty: number; sales_qty: number; adjusted_count: number; gap: number; input_at: string }>();
   for (const row of taskRows) {
     const key = String(row[0] || "").trim();
     if (!key) continue;
     taskMap.set(key, {
-      status: String(row[9] || ""),
       counted_qty: toNumber(row[7]),
-      gap: toNumber(row[8]),
-      input_at: String(row[16] || "")
+      sales_qty: toNumber(row[8]),
+      adjusted_count: toNumber(row[9]),
+      gap: toNumber(row[10]),
+      status: String(row[11] || ""),
+      input_at: String(row[18] || "")
     });
   }
 
@@ -58,6 +60,8 @@ export async function GET() {
         product_type_name: String(row[9] || ""),
         counted: Boolean(task),
         counted_qty: task?.counted_qty ?? null,
+        sales_qty: task?.sales_qty ?? null,
+        adjusted_count: task?.adjusted_count ?? null,
         status: task?.status || "",
         gap: task?.gap ?? null,
         input_at: task?.input_at || ""
