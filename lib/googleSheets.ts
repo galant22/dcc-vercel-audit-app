@@ -39,46 +39,6 @@ export type StockRow = {
   product_type_name: string;
 };
 
-export type AppUser = {
-  user_id: string;
-  email: string;
-  name: string;
-  role: string;
-  warehouse: string;
-  active: boolean;
-  supervisor_email: string;
-};
-
-export async function getActiveUserByEmail(email: string): Promise<AppUser | null> {
-  const normalized = email.trim().toLowerCase();
-  if (!normalized) return null;
-
-  const sheets = await getSheetsClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: spreadsheetId(),
-    range: "USERS!A5:I5000"
-  });
-
-  const rows = res.data.values || [];
-  for (const row of rows) {
-    const userEmail = String(row[1] || "").trim().toLowerCase();
-    const active = String(row[5] || "").trim().toUpperCase();
-    if (userEmail === normalized && active === "TRUE") {
-      return {
-        user_id: String(row[0] || ""),
-        email: userEmail,
-        name: String(row[2] || ""),
-        role: String(row[3] || ""),
-        warehouse: String(row[4] || ""),
-        active: true,
-        supervisor_email: String(row[6] || "")
-      };
-    }
-  }
-
-  return null;
-}
-
 export async function lookupStock(sku: string, location: string): Promise<StockRow | null> {
   const sheets = await getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
@@ -115,7 +75,7 @@ export async function lookupStock(sku: string, location: string): Promise<StockR
 export async function writeDccTask(taskId: string, values: unknown[]) {
   const sheets = await getSheetsClient();
   const id = spreadsheetId();
-  const readRange = "DCC_Task!A" + DCC_START_ROW + ":W" + DCC_END_ROW;
+  const readRange = "DCC_Task!A" + DCC_START_ROW + ":AB" + DCC_END_ROW;
 
   const existing = await sheets.spreadsheets.values.get({
     spreadsheetId: id,
@@ -138,7 +98,7 @@ export async function writeDccTask(taskId: string, values: unknown[]) {
     targetRow = emptyIndex >= 0 ? DCC_START_ROW + emptyIndex : DCC_START_ROW + rows.length;
   }
 
-  const writeRange = "DCC_Task!A" + targetRow + ":W" + targetRow;
+  const writeRange = "DCC_Task!A" + targetRow + ":AB" + targetRow;
   return sheets.spreadsheets.values.update({
     spreadsheetId: id,
     range: writeRange,
