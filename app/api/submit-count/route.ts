@@ -40,12 +40,12 @@ export async function POST(req: Request) {
 
   const inputAt = new Date().toISOString();
   const salesQty = data.sales_qty || 0;
-  const gap = data.counted_qty + salesQty - stock.quantity;
+  const adjustedCount = data.counted_qty + salesQty;
+  const gap = adjustedCount - stock.quantity;
   const status = gap === 0 ? "Sesuai" : "Selisih";
   const varianceValue = gap * stock.price;
   const taskId = stock.sku_number + "|" + stock.rack_name;
   const sessionId = data.session_id || "S-" + Date.now();
-  const noteWithSales = salesQty > 0 ? `[Sales: ${salesQty}] ${data.note}`.trim() : data.note;
 
   await writeDccTask(taskId, [
     taskId,
@@ -56,6 +56,8 @@ export async function POST(req: Request) {
     stock.product_name,
     stock.quantity,
     data.counted_qty,
+    salesQty,
+    adjustedCount,
     gap,
     status,
     varianceValue,
@@ -69,13 +71,16 @@ export async function POST(req: Request) {
     data.device_info,
     sessionId,
     "SINGLE",
-    noteWithSales,
-    "VERCEL_APP"
+    data.note,
+    "VERCEL_APP",
+    inputAt,
+    "",
+    ""
   ]);
 
   return NextResponse.json({
     success: true,
     message: "DCC count submitted",
-    result: { task_id: taskId, status, gap, input_email: email, input_at: inputAt, counted_qty: data.counted_qty, sales_qty: salesQty }
+    result: { task_id: taskId, status, gap, adjusted_count: adjustedCount, input_email: email, input_at: inputAt, counted_qty: data.counted_qty, sales_qty: salesQty }
   });
 }
