@@ -61,6 +61,26 @@ button, input, select { font-family: inherit; }
   text-transform: uppercase;
 }
 .header-actions { display: flex; gap: 10px; align-items: center; }
+.labeled-actions { gap: 8px; }
+.header-action-btn {
+  min-width: 74px;
+  min-height: 44px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #475467;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  padding: 6px 9px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(17,24,39,.04);
+}
+.header-action-icon { display: block; font-size: 20px; line-height: 1; }
+.header-action-label { display: block; font-size: 10px; font-weight: 900; line-height: 1; letter-spacing: .04em; text-transform: uppercase; }
+.refresh-action .header-action-icon { color: #667085; }
+.logout-action { color: #e11d48; border-color: #ffe4e6; background: #fff7f8; }
+.logout-action .header-action-icon { color: #e11d48; }
 .icon-btn, .logout-btn {
   border: 0;
   background: transparent;
@@ -364,7 +384,7 @@ button, input, select { font-family: inherit; }
 }
 .ok-btn { background: #7dd1b5; }
 .bad-btn { background: #fb7581; }
-.ok-btn:disabled, .bad-btn:disabled, .icon-btn:disabled { opacity: .55; }
+.ok-btn:disabled, .bad-btn:disabled, .icon-btn:disabled, .header-action-btn:disabled { opacity: .55; }
 .toast-message {
   position: fixed;
   left: 50%;
@@ -381,10 +401,14 @@ button, input, select { font-family: inherit; }
 }
 @media (max-width: 640px) {
   html, body { overflow-x: hidden; }
-  .panel-header { padding: 12px 14px 8px; }
+  .panel-header { padding: 12px 14px 8px; align-items: center; gap: 8px; }
   .back-icon { font-size: 28px; }
   .panel-header h1 { font-size: 21px; }
-  .user-line { font-size: 10px; letter-spacing: .08em; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-line { font-size: 10px; letter-spacing: .08em; max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .labeled-actions { gap: 6px; }
+  .header-action-btn { min-width: 56px; min-height: 42px; padding: 5px 6px; border-radius: 12px; }
+  .header-action-icon { font-size: 18px; }
+  .header-action-label { font-size: 8.5px; letter-spacing: .02em; }
   .progress-area { padding: 6px 14px 12px; }
   .progress-label { font-size: 10px; letter-spacing: .08em; }
   .search-area { margin: 0 14px 10px; min-height: 48px; padding: 0 12px; grid-template-columns: 28px 1fr; }
