@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { SessionProvider } from "next-auth/react";
 
+type FilterMode = "all" | "open" | "done" | "variance";
+type SortMode = "location" | "sku" | "product" | "system_desc" | "system_asc" | "status";
+
 type StockListItem = {
   row_number: number;
   sku_number: string;
@@ -14,6 +17,8 @@ type StockListItem = {
   product_type_name: string;
   counted: boolean;
   counted_qty: number | null;
+  sales_qty?: number | null;
+  adjusted_count?: number | null;
   status: string;
   gap: number | null;
   input_at: string;
@@ -32,6 +37,8 @@ function DccPage() {
   const [total, setTotal] = useState(0);
   const [done, setDone] = useState(0);
   const [query, setQuery] = useState("");
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("location");
   const [selected, setSelected] = useState<StockListItem | null>(null);
   const [physicalQty, setPhysicalQty] = useState("0");
   const [salesQty, setSalesQty] = useState("0");
@@ -42,15 +49,32 @@ function DccPage() {
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) =>
-      item.location.toLowerCase().includes(q) ||
-      item.sku_number.toLowerCase().includes(q) ||
-      item.product_name.toLowerCase().includes(q)
-    );
-  }, [items, query]);
+    const base = items.filter((item) => {
+      const matchesQuery = !q ||
+        item.location.toLowerCase().includes(q) ||
+        item.sku_number.toLowerCase().includes(q) ||
+        item.product_name.toLowerCase().includes(q);
+
+      if (!matchesQuery) return false;
+      if (filterMode === "open") return !item.counted;
+      if (filterMode === "done") return item.counted;
+      if (filterMode === "variance") return item.counted && Number(item.gap || 0) !== 0;
+      return true;
+    });
+
+    return [...base].sort((a, b) => {
+      if (sortMode === "sku") return a.sku_number.localeCompare(b.sku_number);
+      if (sortMode === "product") return a.product_name.localeCompare(b.product_name);
+      if (sortMode === "system_desc") return b.system_qty - a.system_qty;
+      if (sortMode === "system_asc") return a.system_qty - b.system_qty;
+      if (sortMode === "status") return `${a.status || "ZZZ"}-${a.location}`.localeCompare(`${b.status || "ZZZ"}-${b.location}`);
+      return a.location.localeCompare(b.location, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [items, query, filterMode, sortMode]);
 
   const progress = total ? Math.min(100, (done / total) * 100) : 0;
+  const openCount = total - done;
+  const varianceCount = items.filter((item) => item.counted && Number(item.gap || 0) !== 0).length;
 
   async function loadStockList() {
     setLoading(true);
@@ -76,7 +100,7 @@ function DccPage() {
   function openItem(item: StockListItem) {
     setSelected(item);
     setPhysicalQty(item.counted_qty !== null ? String(item.counted_qty) : "0");
-    setSalesQty("0");
+    setSalesQty(item.sales_qty !== null && item.sales_qty !== undefined ? String(item.sales_qty) : "0");
     setMessage("");
   }
 
@@ -116,10 +140,11 @@ function DccPage() {
 
       const nextStatus = json.result.status;
       const nextGap = json.result.gap;
+      const adjustedCount = json.result.adjusted_count ?? physical + sales;
       const nextItems = items.map((item) => {
         const same = item.sku_number === selected.sku_number && item.location === selected.location;
         return same
-          ? { ...item, counted: true, counted_qty: physical, status: nextStatus, gap: nextGap, input_at: new Date().toISOString() }
+          ? { ...item, counted: true, counted_qty: physical, sales_qty: sales, adjusted_count: adjustedCount, status: nextStatus, gap: nextGap, input_at: new Date().toISOString() }
           : item;
       });
       setItems(nextItems);
@@ -146,6 +171,7 @@ function DccPage() {
   }
 
   const currentGap = selected ? Number(physicalQty || 0) + Number(salesQty || 0) - selected.system_qty : 0;
+  const currentAdjusted = selected ? Number(physicalQty || 0) + Number(salesQty || 0) : 0;
 
   return (
     <main className="panel-shell">
@@ -182,6 +208,26 @@ function DccPage() {
         />
       </section>
 
+      <section className="toolbar-area">
+        <div className="chip-row" aria-label="Filter list">
+          <button className={filterMode === "all" ? "chip active" : "chip"} type="button" onClick={() => setFilterMode("all")}>Semua {total}</button>
+          <button className={filterMode === "open" ? "chip active" : "chip"} type="button" onClick={() => setFilterMode("open")}>Belum {openCount}</button>
+          <button className={filterMode === "done" ? "chip active" : "chip"} type="button" onClick={() => setFilterMode("done")}>Selesai {done}</button>
+          <button className={filterMode === "variance" ? "chip active danger" : "chip danger"} type="button" onClick={() => setFilterMode("variance")}>Selisih {varianceCount}</button>
+        </div>
+        <label className="sort-select">
+          <span>Sort</span>
+          <select value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
+            <option value="location">SLOC A-Z</option>
+            <option value="sku">SKU A-Z</option>
+            <option value="product">Produk A-Z</option>
+            <option value="system_desc">System Qty terbesar</option>
+            <option value="system_asc">System Qty terkecil</option>
+            <option value="status">Status</option>
+          </select>
+        </label>
+      </section>
+
       <section className="list-area">
         {filteredItems.map((item) => (
           <button
@@ -196,7 +242,7 @@ function DccPage() {
               <p className="sku-line">SKU: {item.sku_number}</p>
               <h2>{item.product_name}</h2>
               {item.counted && (
-                <p className="meta-line">▧ QTY: {item.counted_qty ?? 0} &nbsp; ◷ {formatDateTime(item.input_at)}</p>
+                <p className="meta-line">▧ QTY: {item.counted_qty ?? 0} + SALES: {item.sales_qty ?? 0} = {item.adjusted_count ?? 0} &nbsp; ◷ {formatDateTime(item.input_at)}</p>
               )}
             </div>
             <span className={`circle ${item.counted ? "checked" : ""}`}>{item.counted ? "✓" : ""}</span>
@@ -234,19 +280,19 @@ function DccPage() {
               <strong>{selected.product_name}</strong>
             </div>
 
-            <div className="detail-grid two">
+            <div className="detail-grid qty-grid">
               <label className="number-field">
                 <span>KUANTITI FISIK</span>
-                <input inputMode="numeric" value={physicalQty} onChange={(e) => setPhysicalQty(e.target.value)} />
+                <input inputMode="numeric" pattern="[0-9]*" value={physicalQty} onChange={(e) => setPhysicalQty(e.target.value)} />
               </label>
               <label className="number-field">
                 <span>SALES</span>
-                <input inputMode="numeric" value={salesQty} onChange={(e) => setSalesQty(e.target.value)} />
+                <input inputMode="numeric" pattern="[0-9]*" value={salesQty} onChange={(e) => setSalesQty(e.target.value)} />
               </label>
             </div>
 
             <div className="gap-box">
-              <span>(FISIK + SALES) - SYSTEM</span>
+              <span>(FISIK + SALES) - SYSTEM<br /><small>Adjusted Count: {currentAdjusted}</small></span>
               <b className={currentGap === 0 ? "ok-gap" : "bad-gap"}>{currentGap}</b>
             </div>
 
