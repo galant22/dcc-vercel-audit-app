@@ -183,9 +183,15 @@ function DccPage() {
           </div>
           <p className="user-line">✉ {session.user?.email}</p>
         </div>
-        <div className="header-actions">
-          <button className="icon-btn" type="button" onClick={loadStockList} disabled={loading}>↻</button>
-          <button className="logout-btn" type="button" onClick={() => signOut()}>↱</button>
+        <div className="header-actions labeled-actions">
+          <button className="header-action-btn refresh-action" type="button" onClick={loadStockList} disabled={loading} aria-label="Refresh data">
+            <span className="header-action-icon">↻</span>
+            <span className="header-action-label">Refresh</span>
+          </button>
+          <button className="header-action-btn logout-action" type="button" onClick={() => signOut()} aria-label="Logout">
+            <span className="header-action-icon">↱</span>
+            <span className="header-action-label">Logout</span>
+          </button>
         </div>
       </header>
 
